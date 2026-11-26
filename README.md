@@ -152,3 +152,10 @@ sudo install -Dm755 ps5-linux-tools/m2_init ps5-linux-tools/m2_install.sh ps5-li
 
 - The GUI code (`ps5tools/`, `src/`), micro-overlay `ps5overlayd`, `ps5tools-root-helper`, Polkit policy, and build scripts are licensed under the **GNU General Public License v3.0 or later (GPL-3.0-or-later)** — see [LICENSE](LICENSE).
 - The upstream CLI utilities in `ps5-linux-tools/` belong to **[ps5-linux/ps5-linux-tools](https://github.com/ps5-linux/ps5-linux-tools)** and are referenced as an external `git submodule`.
+
+---
+
+## Contributors
+
+- **[chocop1](https://github.com/chocop1)** — Project author & maintainer
+- **Antigravity (Google DeepMind)** — AI coding assistant (PyQt6 & C++17/Qt6 GUI, C `ps5overlayd` Wayland HUD, localization, theme adaptation, and packaging)
