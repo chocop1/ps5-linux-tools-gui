@@ -66,6 +66,8 @@ BUILDDIR=/tmp/makepkg-ps5 makepkg -si
 ```
 *(Использование отдельного `BUILDDIR` для `cpp-qt6` защищает каталог исходников `src/` при очистке сборки `makepkg -c`.)*
 
+> **Про сабмодуль `ps5-linux-tools`:** клонируйте репозиторий с флагом `--recursive` (если забыли — выполните `git submodule update --init --recursive` внутри папки). Если качаете исходники архивом без `git`, берите файлы `*-src.tar.gz` или `*-src.zip` из раздела **Releases** (автоархив GitHub `Source code` оставляет `ps5-linux-tools/` пустым).
+
 ---
 
 ### Способ 3: Сборка и запуск из исходников
@@ -74,7 +76,7 @@ BUILDDIR=/tmp/makepkg-ps5 makepkg -si
 
 **Общие (для `ps5overlayd`, `ps5-linux-tools` и Polkit):**
 ```bash
-sudo pacman -S --needed base-devel pkgconf zlib wayland pango cairo polkit
+sudo pacman -S --needed git base-devel pkgconf zlib wayland pango cairo polkit
 ```
 
 **Для ветки `main` (Python + PyQt6):**
