@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C / C++ / Qt6 build artifacts
+build/
+*.o
+moc_*
+qrc_*
+ui_*
+.qmake.stash
+ps5overlayd
+ps5tools-qt6
+
+# AppImage & Arch makepkg outputs
+*.AppImage
+*.AppDir/
+/pkg/
+/src/
+*.pkg.tar.*
+
+# Compiled upstream tools (built from submodule)
+ps5-linux-tools/ps5_control
+ps5-linux-tools/m2_init
+
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+*~

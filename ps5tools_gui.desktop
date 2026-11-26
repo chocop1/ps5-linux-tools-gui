@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=PS5 Linux Tools
+Name[ru]=Инструменты PS5 Linux
+Comment=Unified GUI for ps5-linux-tools, cooling, monitoring, display and M.2 SSD
+Comment[ru]=Управление вентилятором, Boost, кривой охлаждения, дисплеем и M.2 SSD PS5
+Exec=ps5tools-gui
+Icon=ps5tools
+Terminal=false
+Type=Application
+Categories=System;HardwareSettings;
+Keywords=ps5;fan;boost;m2;nvme;monitor;overlay;
+StartupNotify=true
