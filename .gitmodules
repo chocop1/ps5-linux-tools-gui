@@ -1,0 +1,3 @@
+[submodule "ps5-linux-tools"]
+	path = ps5-linux-tools
+	url = https://github.com/ps5-linux/ps5-linux-tools.git

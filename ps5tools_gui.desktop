@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=PS5 Linux Tools (Qt6 C++)
+Name[ru]=Инструменты PS5 Linux (Qt6 C++)
+Comment=Native C++ Qt6 GUI for ps5-linux-tools, cooling, monitoring, display and M.2 SSD
+Comment[ru]=Нативное Qt6 C++ приложение для управления PS5 Linux
+Exec=ps5tools-qt6
+Icon=ps5tools
+Terminal=false
+Type=Application
+Categories=System;HardwareSettings;
+Keywords=ps5;fan;boost;m2;nvme;monitor;overlay;
+StartupNotify=true

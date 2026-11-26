@@ -1,0 +1,256 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Privileged helper for PS5 Linux Tools.
+Installed to /usr/local/libexec/ps5tools-helper and invoked via pkexec
+with the org.ps5linuxtools.policy Polkit policy (auth_admin_keep).
+Strictly validates all arguments and executes only trusted system paths.
+"""
+
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+SBIN_DIR = Path('/usr/local/sbin')
+SYSTEMD_DIR = Path('/etc/systemd/system')
+MNT_IMG_SRC = '/mnt/ps5_image_src'
+
+ALLOWED_UNITS = {
+    'ps5fan.service',
+    'ps5boost.service',
+    'ps5-bt-quiet.service',
+    'ps5-bt-sync.service',
+    'ps5-stage-firmware.service',
+    'ps5-stage-gpu-firmware.service',
+    'ps5-fan-curve.service',
+}
+
+ALLOWED_SYSTEMCTL_OPS = {
+    'start', 'stop', 'restart', 'enable', 'disable', 'enable-now', 'disable-now'
+}
+
+
+def find_ps5_fan_hwmon() -> Path:
+    for p in sorted(Path('/sys/class/hwmon').glob('hwmon*')):
+        try:
+            if (p / 'name').read_text(encoding='utf-8').strip() == 'ps5_fan':
+                return p
+        except OSError:
+            pass
+    raise RuntimeError('hwmon ps5_fan не найден')
+
+
+def write_sysfs(path: Path, value: str):
+    path.write_text(f'{value}\n', encoding='utf-8')
+
+
+def run_sbin(name: str, args: list[str]) -> int:
+    exe = SBIN_DIR / name
+    if not exe.is_file():
+        print(f'Бинарник не найден: {exe}', file=sys.stderr)
+        return 127
+    proc = subprocess.run([str(exe), *args])
+    return proc.returncode
+
+
+def parse_curve_args(args: list[str]) -> tuple[int, list[tuple[int, int]]]:
+    """Parse <hyst_mc> <t1>:<p1> ... <t8>:<p8> and validate ranges."""
+    if len(args) != 9:
+        raise ValueError('Ожидается 9 аргументов: <hyst_mc> и 8 точек <temp_mc>:<pwm>')
+    hyst_mc = int(args[0])
+    if not (20000 <= hyst_mc <= 105000):
+        raise ValueError(f'Недопустимый гистерезис: {hyst_mc}')
+    points = []
+    prev_t = 0
+    for tok in args[1:]:
+        if ':' not in tok:
+            raise ValueError(f'Неверный формат точки: {tok}')
+        t_s, p_s = tok.split(':', 1)
+        t_mc = int(t_s)
+        pwm = int(p_s)
+        if not (20000 <= t_mc <= 110000):
+            raise ValueError(f'Температура вне диапазона 20..110°C: {t_mc}')
+        if not (0 <= pwm <= 255):
+            raise ValueError(f'PWM вне диапазона 0..255: {pwm}')
+        if t_mc < prev_t:
+            raise ValueError('Температуры точек кривой не должны убывать')
+        prev_t = t_mc
+        points.append((t_mc, pwm))
+    return hyst_mc, points
+
+
+def apply_fan_curve(hyst_mc: int, points: list[tuple[int, int]]):
+    hw = find_ps5_fan_hwmon()
+    write_sysfs(hw / 'pwm1_enable', '2')
+    write_sysfs(hw / 'pwm1_auto_point1_temp_hyst', str(hyst_mc))
+    for idx, (t_mc, pwm) in enumerate(points, start=1):
+        write_sysfs(hw / f'pwm1_auto_point{idx}_temp', str(t_mc))
+        write_sysfs(hw / f'pwm1_auto_point{idx}_pwm', str(pwm))
+    print(f'Кривая ps5_fan применена ({len(points)} точек, hyst={hyst_mc} mC)')
+
+
+def unmount_image() -> int:
+    res = subprocess.run(
+        ['findmnt', '-n', '-o', 'SOURCE', MNT_IMG_SRC],
+        capture_output=True, text=True
+    )
+    if res.returncode != 0 or not res.stdout.strip():
+        print(f'{MNT_IMG_SRC} не примонтирован')
+        return 0
+    src = res.stdout.strip()
+    subprocess.run(['umount', '-R', MNT_IMG_SRC], check=True)
+    # Resolve the base loop device (e.g. /dev/loop0p1 -> /dev/loop0)
+    m = re.match(r'^(/dev/loop\d+)', src)
+    if m:
+        subprocess.run(['losetup', '-d', m.group(1)], check=False)
+    print(f'Размонтировано: {MNT_IMG_SRC} ({src})')
+    return 0
+
+
+def check_nvme_not_root():
+    res = subprocess.run(
+        ['findmnt', '-n', '-o', 'SOURCE', '/'],
+        capture_output=True, text=True
+    )
+    root_src = res.stdout.strip()
+    if root_src.startswith('/dev/nvme0n1'):
+        raise RuntimeError(
+            f'Операция заблокирована: текущая ОС загружена с {root_src}!'
+        )
+
+
+def main() -> int:
+    if os.geteuid() != 0:
+        print('Helper должен запускаться от root', file=sys.stderr)
+        return 1
+    if len(sys.argv) < 2:
+        print('Не указана подкоманда', file=sys.stderr)
+        return 2
+
+    cmd = sys.argv[1]
+    rest = sys.argv[2:]
+
+    try:
+        if cmd == 'fan':
+            if len(rest) != 1 or rest[0] not in ('on', 'off', 'max'):
+                raise ValueError('fan: допустимы on|off|max')
+            return run_sbin('ps5_control', ['--fan', rest[0]])
+
+        if cmd == 'boost':
+            if len(rest) != 1 or rest[0] not in ('on', 'off'):
+                raise ValueError('boost: допустимы on|off')
+            return run_sbin('ps5_control', ['--boost', rest[0]])
+
+        if cmd == 'fan-pwm':
+            if len(rest) != 1:
+                raise ValueError('fan-pwm: ожидается значение 0..255')
+            pwm = int(rest[0])
+            if not (0 <= pwm <= 255):
+                raise ValueError('PWM должен быть 0..255')
+            hw = find_ps5_fan_hwmon()
+            write_sysfs(hw / 'pwm1_enable', '1')
+            write_sysfs(hw / 'pwm1', str(pwm))
+            print(f'Установлен ручной режим PWM = {pwm}/255')
+            return 0
+
+        if cmd == 'fan-auto':
+            hw = find_ps5_fan_hwmon()
+            write_sysfs(hw / 'pwm1_enable', '2')
+            print('Включён автоматический режим кривой (pwm1_enable=2)')
+            return 0
+
+        if cmd == 'fan-curve':
+            hyst_mc, points = parse_curve_args(rest)
+            apply_fan_curve(hyst_mc, points)
+            return 0
+
+        if cmd == 'fan-curve-reset':
+            hw = find_ps5_fan_hwmon()
+            write_sysfs(hw / 'curve_reset', '1')
+            write_sysfs(hw / 'pwm1_enable', '2')
+            print('Кривая вентилятора сброшена к заводской (curve_reset)')
+            return 0
+
+        if cmd == 'fan-curve-persist':
+            if not rest or rest[0] not in ('enable', 'disable'):
+                raise ValueError('fan-curve-persist: enable|disable')
+            unit_path = SYSTEMD_DIR / 'ps5-fan-curve.service'
+            if rest[0] == 'disable':
+                subprocess.run(['systemctl', 'disable', '--now', 'ps5-fan-curve.service'], check=False)
+                if unit_path.exists():
+                    unit_path.unlink()
+                subprocess.run(['systemctl', 'daemon-reload'], check=True)
+                print('Автозапуск пользовательской кривой отключён')
+                return 0
+            hyst_mc, points = parse_curve_args(rest[1:])
+            apply_fan_curve(hyst_mc, points)
+            args_str = ' '.join([str(hyst_mc)] + [f'{t}:{p}' for t, p in points])
+            unit_content = (
+                '[Unit]\n'
+                'Description=Apply custom PS5 fan curve\n'
+                'After=multi-user.target ps5fan.service\n\n'
+                '[Service]\n'
+                'Type=oneshot\n'
+                f'ExecStart=/usr/local/libexec/ps5tools-helper fan-curve {args_str}\n'
+                'RemainAfterExit=yes\n\n'
+                '[Install]\n'
+                'WantedBy=multi-user.target\n'
+            )
+            unit_path.write_text(unit_content, encoding='utf-8')
+            os.chmod(unit_path, 0o644)
+            subprocess.run(['systemctl', 'daemon-reload'], check=True)
+            subprocess.run(['systemctl', 'enable', '--now', 'ps5-fan-curve.service'], check=True)
+            print('Сервис ps5-fan-curve.service установлен и включён')
+            return 0
+
+        if cmd == 'systemctl':
+            if len(rest) != 2:
+                raise ValueError('systemctl: ожидается <op> <unit>')
+            op, unit = rest
+            if op not in ALLOWED_SYSTEMCTL_OPS:
+                raise ValueError(f'Недопустимая операция systemctl: {op}')
+            if unit not in ALLOWED_UNITS:
+                raise ValueError(f'Недопустимая служба: {unit}')
+            if op == 'enable-now':
+                cmd_args = ['systemctl', 'enable', '--now', unit]
+            elif op == 'disable-now':
+                cmd_args = ['systemctl', 'disable', '--now', unit]
+            else:
+                cmd_args = ['systemctl', op, unit]
+            return subprocess.run(cmd_args).returncode
+
+        if cmd == 'm2-init':
+            check_nvme_not_root()
+            return run_sbin('m2_init', [])
+
+        if cmd == 'm2-mount':
+            if len(rest) != 1 or not Path(rest[0]).is_file():
+                raise ValueError('Укажите существующий файл образа')
+            return run_sbin('m2_install.sh', ['--mount', rest[0]])
+
+        if cmd == 'm2-unmount':
+            return unmount_image()
+
+        if cmd == 'm2-install':
+            if len(rest) != 1 or not Path(rest[0]).is_file():
+                raise ValueError('Укажите существующий файл образа')
+            check_nvme_not_root()
+            return run_sbin('m2_install.sh', ['--install', rest[0]])
+
+        if cmd == 'm2-exec':
+            return run_sbin('m2_exec.sh', [])
+
+        if cmd == 'warm-reboot':
+            return run_sbin('ps5-linux-warm-reboot.sh', [])
+
+        raise ValueError(f'Неизвестная команда: {cmd}')
+
+    except Exception as exc:
+        print(f'Ошибка: {exc}', file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
