@@ -66,6 +66,8 @@ BUILDDIR=/tmp/makepkg-ps5 makepkg -si
 ```
 *(Setting a separate `BUILDDIR` on `cpp-qt6` protects the local `./src/` C++ source folder if `makepkg -c` cleans `$srcdir`.)*
 
+> **Submodule note:** Always clone with `--recursive` so `ps5-linux-tools/` is populated (if omitted, run `git submodule update --init --recursive`). When downloading archives manually instead of using `git`, grab `*-src.tar.gz` or `*-src.zip` from **Releases** rather than GitHub's auto-generated `Source code` archive, which leaves submodules empty.
+
 ---
 
 ### Method 3: Build and Run from Source
@@ -74,7 +76,7 @@ BUILDDIR=/tmp/makepkg-ps5 makepkg -si
 
 **Common (for `ps5overlayd`, `ps5-linux-tools`, and Polkit):**
 ```bash
-sudo pacman -S --needed base-devel pkgconf zlib wayland pango cairo polkit
+sudo pacman -S --needed git base-devel pkgconf zlib wayland pango cairo polkit
 ```
 
 **For `main` (Python + PyQt6):**
