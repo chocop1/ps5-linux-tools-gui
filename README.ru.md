@@ -12,8 +12,8 @@
 
 | Ветка | Стек GUI | Оверлей | Память GUI (`VmRSS` / `RssAnon`) | Память оверлея (`ps5overlayd`) |
 | --- | --- | --- | --- | --- |
-| **`main`** | Python 3 + PyQt6 | C (`wlroots` layer-shell + PangoCairo) | ~105 MiB / ~29.7 MiB | ~18.4 MiB / ~4.2 MiB |
-| **`cpp-qt6`** | C++17 + Qt6 | C (`wlroots` layer-shell + PangoCairo) | ~77.7 MiB / ~15.6 MiB | ~18.4 MiB / ~4.2 MiB |
+| **`main`** | C++17 + Qt6 | C (`wlroots` layer-shell + PangoCairo) | ~77.7 MiB / ~15.6 MiB | ~18.4 MiB / ~4.2 MiB |
+| **`python-pyqt6`** | Python 3 + PyQt6 | C (`wlroots` layer-shell + PangoCairo) | ~105 MiB / ~29.7 MiB | ~18.4 MiB / ~4.2 MiB |
 
 Обе ветки предоставляют одинаковый функционал, используют один и тот же C-демон оверлея `ps5overlayd` (который продолжает работать на экране даже после полного закрытия GUI) и единый Polkit-хелпер `ps5tools-root-helper`.
 
@@ -51,20 +51,20 @@
 
 ### Способ 2: Arch Linux / CachyOS через `PKGBUILD`
 
-#### Ветка `main` (Python + PyQt6)
+#### Ветка `main` (C++ + Qt6)
 ```bash
 git clone --recursive https://github.com/chocop1/ps5-linux-tools-gui.git
 cd ps5-linux-tools-gui
-makepkg -si
-```
-
-#### Ветка `cpp-qt6` (C++ + Qt6)
-```bash
-git clone --recursive -b cpp-qt6 https://github.com/chocop1/ps5-linux-tools-gui.git
-cd ps5-linux-tools-gui
 BUILDDIR=/tmp/makepkg-ps5 makepkg -si
 ```
-*(Использование отдельного `BUILDDIR` для `cpp-qt6` защищает каталог исходников `src/` при очистке сборки `makepkg -c`.)*
+*(Использование отдельного `BUILDDIR` для `main` защищает каталог исходников `src/` при очистке сборки `makepkg -c`.)*
+
+#### Ветка `python-pyqt6` (Python + PyQt6)
+```bash
+git clone --recursive -b python-pyqt6 https://github.com/chocop1/ps5-linux-tools-gui.git
+cd ps5-linux-tools-gui
+makepkg -si
+```
 
 > **Про сабмодуль `ps5-linux-tools`:** клонируйте репозиторий с флагом `--recursive` (если забыли — выполните `git submodule update --init --recursive` внутри папки). Если качаете исходники архивом без `git`, берите файлы `*-src.tar.gz` или `*-src.zip` из раздела **Releases** (автоархив GitHub `Source code` оставляет `ps5-linux-tools/` пустым).
 
@@ -79,14 +79,14 @@ BUILDDIR=/tmp/makepkg-ps5 makepkg -si
 sudo pacman -S --needed git base-devel pkgconf zlib wayland pango cairo polkit
 ```
 
-**Для ветки `main` (Python + PyQt6):**
-```bash
-sudo pacman -S --needed python python-pyqt6
-```
-
-**Для ветки `cpp-qt6` (C++ + Qt6):**
+**Для ветки `main` (C++ + Qt6):**
 ```bash
 sudo pacman -S --needed qt6-base qt6-wayland layer-shell-qt
+```
+
+**Для ветки `python-pyqt6` (Python + PyQt6):**
+```bash
+sudo pacman -S --needed python python-pyqt6
 ```
 
 **Опционально (для полной функциональности в KDE Plasma):**
@@ -94,10 +94,26 @@ sudo pacman -S --needed qt6-base qt6-wayland layer-shell-qt
 sudo pacman -S --needed kscreen mangohud dolphin
 ```
 
-#### Сборка ветки `main` (Python + C overlay)
+#### Сборка ветки `main` (C++ + Qt6 + C overlay)
 
 ```bash
 git clone --recursive https://github.com/chocop1/ps5-linux-tools-gui.git
+cd ps5-linux-tools-gui
+
+# 1. Сборка ps5-linux-tools, ps5overlayd и ps5tools-qt6 одной командой
+./build.sh
+
+# 2. Запуск GUI
+./ps5tools-qt6
+
+# Либо сборка AppImage:
+./build_appimage.sh
+```
+
+#### Сборка ветки `python-pyqt6` (Python + C overlay)
+
+```bash
+git clone --recursive -b python-pyqt6 https://github.com/chocop1/ps5-linux-tools-gui.git
 cd ps5-linux-tools-gui
 
 # 1. Сборка CLI-утилит ps5_control и m2_init
@@ -110,22 +126,6 @@ make -C overlay_c
 python3 ps5tools_gui.py
 
 # Либо сборка AppImage (потребуется curl или wget для appimagetool):
-./build_appimage.sh
-```
-
-#### Сборка ветки `cpp-qt6` (C++ + Qt6 + C overlay)
-
-```bash
-git clone --recursive -b cpp-qt6 https://github.com/chocop1/ps5-linux-tools-gui.git
-cd ps5-linux-tools-gui
-
-# 1. Сборка ps5-linux-tools, ps5overlayd и ps5tools-qt6 одной командой
-./build.sh
-
-# 2. Запуск GUI
-./ps5tools-qt6
-
-# Либо сборка AppImage:
 ./build_appimage.sh
 ```
 

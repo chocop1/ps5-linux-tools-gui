@@ -12,8 +12,8 @@ A native graphical interface for managing and monitoring PlayStation 5 / PS5 Pro
 
 | Branch | GUI Stack | Overlay | GUI Memory (`VmRSS` / `RssAnon`) | Overlay Memory (`ps5overlayd`) |
 | --- | --- | --- | --- | --- |
-| **`main`** | Python 3 + PyQt6 | C (`wlroots` layer-shell + PangoCairo) | ~105 MiB / ~29.7 MiB | ~18.4 MiB / ~4.2 MiB |
-| **`cpp-qt6`** | C++17 + Qt6 | C (`wlroots` layer-shell + PangoCairo) | ~77.7 MiB / ~15.6 MiB | ~18.4 MiB / ~4.2 MiB |
+| **`main`** | C++17 + Qt6 | C (`wlroots` layer-shell + PangoCairo) | ~77.7 MiB / ~15.6 MiB | ~18.4 MiB / ~4.2 MiB |
+| **`python-pyqt6`** | Python 3 + PyQt6 | C (`wlroots` layer-shell + PangoCairo) | ~105 MiB / ~29.7 MiB | ~18.4 MiB / ~4.2 MiB |
 
 Both branches provide identical features, share the same native C overlay daemon `ps5overlayd` (which keeps running on screen even after the main GUI is exited), and use the same Polkit helper `ps5tools-root-helper`.
 
@@ -51,20 +51,20 @@ Both branches provide identical features, share the same native C overlay daemon
 
 ### Method 2: Arch Linux / CachyOS via `PKGBUILD`
 
-#### Branch `main` (Python + PyQt6)
+#### Branch `main` (C++ + Qt6)
 ```bash
 git clone --recursive https://github.com/chocop1/ps5-linux-tools-gui.git
 cd ps5-linux-tools-gui
-makepkg -si
-```
-
-#### Branch `cpp-qt6` (C++ + Qt6)
-```bash
-git clone --recursive -b cpp-qt6 https://github.com/chocop1/ps5-linux-tools-gui.git
-cd ps5-linux-tools-gui
 BUILDDIR=/tmp/makepkg-ps5 makepkg -si
 ```
-*(Setting a separate `BUILDDIR` on `cpp-qt6` protects the local `./src/` C++ source folder if `makepkg -c` cleans `$srcdir`.)*
+*(Setting a separate `BUILDDIR` on `main` protects the local `./src/` C++ source folder if `makepkg -c` cleans `$srcdir`.)*
+
+#### Branch `python-pyqt6` (Python + PyQt6)
+```bash
+git clone --recursive -b python-pyqt6 https://github.com/chocop1/ps5-linux-tools-gui.git
+cd ps5-linux-tools-gui
+makepkg -si
+```
 
 > **Submodule note:** Always clone with `--recursive` so `ps5-linux-tools/` is populated (if omitted, run `git submodule update --init --recursive`). When downloading archives manually instead of using `git`, grab `*-src.tar.gz` or `*-src.zip` from **Releases** rather than GitHub's auto-generated `Source code` archive, which leaves submodules empty.
 
@@ -79,14 +79,14 @@ BUILDDIR=/tmp/makepkg-ps5 makepkg -si
 sudo pacman -S --needed git base-devel pkgconf zlib wayland pango cairo polkit
 ```
 
-**For `main` (Python + PyQt6):**
-```bash
-sudo pacman -S --needed python python-pyqt6
-```
-
-**For `cpp-qt6` (C++ + Qt6):**
+**For `main` (C++ + Qt6):**
 ```bash
 sudo pacman -S --needed qt6-base qt6-wayland layer-shell-qt
+```
+
+**For `python-pyqt6` (Python + PyQt6):**
+```bash
+sudo pacman -S --needed python python-pyqt6
 ```
 
 **Optional (recommended on KDE Plasma):**
@@ -94,10 +94,26 @@ sudo pacman -S --needed qt6-base qt6-wayland layer-shell-qt
 sudo pacman -S --needed kscreen mangohud dolphin
 ```
 
-#### Building `main` (Python + C overlay)
+#### Building `main` (C++ + Qt6 + C overlay)
 
 ```bash
 git clone --recursive https://github.com/chocop1/ps5-linux-tools-gui.git
+cd ps5-linux-tools-gui
+
+# 1. Build ps5-linux-tools, ps5overlayd, and ps5tools-qt6
+./build.sh
+
+# 2. Launch the GUI
+./ps5tools-qt6
+
+# Or build an AppImage:
+./build_appimage.sh
+```
+
+#### Building `python-pyqt6` (Python + C overlay)
+
+```bash
+git clone --recursive -b python-pyqt6 https://github.com/chocop1/ps5-linux-tools-gui.git
 cd ps5-linux-tools-gui
 
 # 1. Build upstream CLI utilities (ps5_control and m2_init)
@@ -110,22 +126,6 @@ make -C overlay_c
 python3 ps5tools_gui.py
 
 # Or build an AppImage (requires curl or wget to fetch appimagetool):
-./build_appimage.sh
-```
-
-#### Building `cpp-qt6` (C++ + Qt6 + C overlay)
-
-```bash
-git clone --recursive -b cpp-qt6 https://github.com/chocop1/ps5-linux-tools-gui.git
-cd ps5-linux-tools-gui
-
-# 1. Build ps5-linux-tools, ps5overlayd, and ps5tools-qt6
-./build.sh
-
-# 2. Launch the GUI
-./ps5tools-qt6
-
-# Or build an AppImage:
 ./build_appimage.sh
 ```
 
